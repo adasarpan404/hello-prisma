@@ -22,7 +22,7 @@ app.post(`/signup`, async (req, res) => {
       },
     },
   })
-  res.json(result)
+  res.status(200).json(result)
 })
 
 app.post(`/post`, async (req, res) => {
@@ -34,7 +34,7 @@ app.post(`/post`, async (req, res) => {
       author: { connect: { email: authorEmail } },
     },
   })
-  res.json(result)
+  res.status(200).json(result)
 })
 
 app.put('/post/:id/views', async (req, res) => {
@@ -50,7 +50,7 @@ app.put('/post/:id/views', async (req, res) => {
       },
     })
 
-    res.json(post)
+    res.status(200).json(post)
   } catch (error) {
     res.json({ error: `Post with ID ${id} does not exist in the database` })
   }
@@ -71,7 +71,7 @@ app.put('/publish/:id', async (req, res) => {
       where: { id: Number(id) || undefined },
       data: { published: !postData?.published },
     })
-    res.json(updatedPost)
+    res.status(200).json(updatedPost)
   } catch (error) {
     res.json({ error: `Post with ID ${id} does not exist in the database` })
   }
@@ -84,12 +84,12 @@ app.delete(`/post/:id`, async (req, res) => {
       id: Number(id),
     },
   })
-  res.json(post)
+  res.status(200).json(post)
 })
 
 app.get('/users', async (req, res) => {
   const users = await prisma.user.findMany()
-  res.json(users)
+  res.status(200).json(users)
 })
 
 app.get('/user/:id/drafts', async (req, res) => {
@@ -105,7 +105,7 @@ app.get('/user/:id/drafts', async (req, res) => {
       where: { published: false },
     })
 
-  res.json(drafts)
+  res.status(200).json(drafts)
 })
 
 app.get(`/post/:id`, async (req, res) => {
@@ -114,7 +114,7 @@ app.get(`/post/:id`, async (req, res) => {
   const post = await prisma.post.findUnique({
     where: { id: Number(id) },
   })
-  res.json(post)
+  res.status(200).json(post)
 })
 
 app.get('/feed', async (req, res) => {
@@ -142,7 +142,7 @@ app.get('/feed', async (req, res) => {
     },
   })
 
-  res.json(posts)
+  res.status(200).json(posts)
 })
 
 const server = app.listen(3000, () =>
