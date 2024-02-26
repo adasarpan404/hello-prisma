@@ -1,37 +1,152 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from '@prisma/client'
+import express from 'express'
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
+const app = express()
 
-async function main() {
-    await prisma.user.create({
-        data: {
-            name: 'Alice',
-            email: 'alice@prisma.io',
-            posts: {
-                create: { title: 'Hello World' },
-            },
-            profile: {
-                create: { bio: 'I like turtles' },
-            },
+app.use(express.json())
+
+app.post(`/signup`, async (req, res) => {
+  const { name, email, posts } = req.body
+
+  const postData = posts?.map((post: Prisma.PostCreateInput) => {
+    return { title: post?.title, content: post?.content }
+  })
+
+  const result = await prisma.user.create({
+    data: {
+      name,
+      email,
+      posts: {
+        create: postData,
+      },
+    },
+  })
+  res.status(200).json(result)
+})
+
+app.post(`/post`, async (req, res) => {
+  const { title, content, authorEmail } = req.body
+  const result = await prisma.post.create({
+    data: {
+      title,
+      content,
+      author: { connect: { email: authorEmail } },
+    },
+  })
+  res.status(200).json(result)
+})
+
+app.put('/post/:id/views', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const post = await prisma.post.update({
+      where: { id: Number(id) },
+      data: {
+        viewCount: {
+          increment: 1,
         },
+      },
     })
 
-    const allUsers = await prisma.user.findMany({
-        include: {
-            posts: true,
-            profile: true,
-        },
-    })
-    console.dir(allUsers, { depth: null })
-}
+    res.status(200).json(post)
+  } catch (error) {
+    res.status(500).json({ error: `Post with ID ${id} does not exist in the database` })
+  }
+})
 
+app.put('/publish/:id', async (req, res) => {
+  const { id } = req.params
 
-main()
-    .then(async () => {
-        await prisma.$disconnect()
+  try {
+    const postData = await prisma.post.findUnique({
+      where: { id: Number(id) },
+      select: {
+        published: true,
+      },
     })
-    .catch(async (e) => {
-        console.error(e)
-        await prisma.$disconnect()
-        process.exit(1)
+
+    const updatedPost = await prisma.post.update({
+      where: { id: Number(id) || undefined },
+      data: { published: !postData?.published },
     })
+    res.status(200).json(updatedPost)
+  } catch (error) {
+    res.status(500).json({ error: `Post with ID ${id} does not exist in the database` })
+  }
+})
+
+app.delete(`/post/:id`, async (req, res) => {
+  const { id } = req.params
+  const post = await prisma.post.delete({
+    where: {
+      id: Number(id),
+    },
+  })
+  res.status(200).json(post)
+})
+
+app.get('/users', async (req, res) => {
+  const users = await prisma.user.findMany()
+  res.status(200).json(users)
+})
+
+app.get('/user/:id/drafts', async (req, res) => {
+  const { id } = req.params
+
+  const drafts = await prisma.user
+    .findUnique({
+      where: {
+        id: Number(id),
+      },
+    })
+    .posts({
+      where: { published: false },
+    })
+
+  res.status(200).json(drafts)
+})
+
+app.get(`/post/:id`, async (req, res) => {
+  const { id }: { id?: string } = req.params
+
+  const post = await prisma.post.findUnique({
+    where: { id: Number(id) },
+  })
+  res.status(200).json(post)
+})
+
+app.get('/feed', async (req, res) => {
+  const { searchString, skip, take, orderBy } = req.query
+
+  const or: Prisma.PostWhereInput = searchString
+    ? {
+        OR: [
+          { title: { contains: searchString as string } },
+          { content: { contains: searchString as string } },
+        ],
+      }
+    : {}
+
+  const posts = await prisma.post.findMany({
+    where: {
+      published: true,
+      ...or,
+    },
+    include: { author: true },
+    take: Number(take) || undefined,
+    skip: Number(skip) || undefined,
+    orderBy: {
+      updatedAt: orderBy as Prisma.SortOrder,
+    },
+  })
+
+  res.status(200).json(posts)
+})
+
+const server = app.listen(3000, () =>
+  console.log(`
+🚀 Server ready at: http://localhost:3000
+⭐️ See sample requests: http://pris.ly/e/ts/rest-express#3-using-the-rest-api`),
+)
